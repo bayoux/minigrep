@@ -1,53 +1,35 @@
+use clap::Parser;
+use colored::Colorize;
+
+#[derive(Parser)]
+#[command(name = "minigrep", about = "Search for a pattern in a file")]
 pub struct Config {
+    /// Pattern to search for
     pub pattern: String,
+    /// File to search in
     pub file_path: String,
+    /// Case-insensitive search (also enabled by IGNORE_CASE env var)
+    #[arg(short = 'i', long)]
     pub ignore_case: bool,
 }
 
-impl Config {
-    pub fn build(args: &[String]) -> Result<Config, &'static str> {
-        if args.len() < 3 {
-            return Err("not enough arguments, usage: minigrep <pattern> <file> [--ignore-case]");
-        }
-
-        let pattern = args[1].clone();
-        let file_path = args[2].clone();
-        let ignore_case = args.iter().any(|arg| arg == "--ignore-case");
-
-        Ok(Config { pattern, file_path, ignore_case })
-    }
-}
-
 pub fn search<'a>(pattern: &str, contents: &'a str, ignore_case: bool) -> Vec<(usize, &'a str)> {
-    let mut results = Vec::new();
+    let pattern = if ignore_case { pattern.to_lowercase() } else { pattern.to_string() };
 
-    let search_pattern = if ignore_case {
-        pattern.to_lowercase()
-    } else {
-        pattern.to_string()
-    };
-
-    for (i, line) in contents.lines().enumerate() {
-        let line_to_check = if ignore_case {
-            line.to_lowercase()
-        } else {
-            line.to_string()
-        };
-
-        if line_to_check.contains(&search_pattern) {
-            results.push((i + 1, line));
-        }
-    }
-
-    results
+    contents
+        .lines()
+        .enumerate()
+        .filter(|(_, line)| {
+            let line_check = if ignore_case { line.to_lowercase() } else { line.to_string() };
+            line_check.contains(&pattern)
+        })
+        .map(|(i, line)| (i + 1, line))
+        .collect()
 }
 
 pub fn highlight(line: &str, pattern: &str, ignore_case: bool) -> String {
-    const RED: &str = "\x1b[31m";
-    const RESET: &str = "\x1b[0m";
-
     if !ignore_case {
-        return line.replace(pattern, &format!("{RED}{pattern}{RESET}"));
+        return line.replace(pattern, &pattern.red().to_string());
     }
 
     let lower_line = line.to_lowercase();
@@ -59,12 +41,10 @@ pub fn highlight(line: &str, pattern: &str, ignore_case: bool) -> String {
 
     while let Some(pos) = lower_line[start..].find(&lower_pattern) {
         let match_start = start + pos;
-        let match_end = match_start + pattern.len();
+        let match_end = match_start + lower_pattern.len();
 
         result.push_str(&line[last_end..match_start]);
-        result.push_str(RED);
-        result.push_str(&line[match_start..match_end]);
-        result.push_str(RESET);
+        result.push_str(&line[match_start..match_end].red().to_string());
 
         last_end = match_end;
         start = match_end;
@@ -73,8 +53,6 @@ pub fn highlight(line: &str, pattern: &str, ignore_case: bool) -> String {
     result.push_str(&line[last_end..]);
     result
 }
-
-// Util tests
 
 #[cfg(test)]
 mod tests {
@@ -114,13 +92,15 @@ DUCT TAPE.";
 
     #[test]
     fn highlight_wraps_match_in_red() {
+        colored::control::set_override(true);
         let result = highlight("hello world", "world", false);
-        assert_eq!(result, "hello \x1b[31mworld\x1b[0m");
+        assert_eq!(result, format!("hello {}", "world".red()));
     }
 
     #[test]
     fn highlight_preserves_original_case() {
+        colored::control::set_override(true);
         let result = highlight("Hello WORLD", "world", true);
-        assert_eq!(result, "Hello \x1b[31mWORLD\x1b[0m");
+        assert_eq!(result, format!("Hello {}", "WORLD".red()));
     }
 }

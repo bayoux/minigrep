@@ -1,14 +1,13 @@
 use std::{env, fs, process};
 
+use clap::Parser;
 use minigrep::{Config, highlight, search};
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-
-    let config = Config::build(&args).unwrap_or_else(|err| {
-        eprintln!("Problem parsing arguments: {err}");
-        process::exit(1);
-    });
+    let mut config = Config::parse();
+    if env::var("IGNORE_CASE").is_ok() {
+        config.ignore_case = true;
+    }
 
     let contents = fs::read_to_string(&config.file_path).unwrap_or_else(|err| {
         eprintln!("Error reading file: {err}");
