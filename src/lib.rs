@@ -7,7 +7,8 @@ pub struct Config {
     /// Pattern to search for
     pub pattern: String,
     /// File to search in
-    pub file_path: String,
+    #[arg(required = true, num_args = 1..)]
+    pub file_paths: Vec<String>,
     /// Case-insensitive search (also enabled by IGNORE_CASE env var)
     #[arg(short = 'i', long)]
     pub ignore_case: bool,
